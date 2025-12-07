@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and user management
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String?
+  phone        String?
+  role         UserRole  @default(USER)
+  isActive     Boolean   @default(true) @map("is_active")
+  
+  // Timestamps
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  reservations Reservation[]
+  reviews      Review[]
+  
+  // Indexes
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// Restaurant model
+model Restaurant {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  cuisine     String?
+  address     String
+  phone       String?
+  email       String?
+  website     String?
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  // Operating hours
+  openingTime String    @map("opening_time") // HH:MM format
+  closingTime String    @map("closing_time") // HH:MM format
+  
+  // Capacity and pricing
+  maxCapacity Int       @map("max_capacity")
+  priceRange  PriceRange @default(MEDIUM)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  tables       Table[]
+  reservations Reservation[]
+  reviews      Review[]
+  
+  // Indexes
+  @@index([cuisine])
+  @@index([priceRange])
+  @@index([isActive])
+  @@map("restaurants")
+}
+
+// Table model
+model Table {
+  id           String     @id @default(cuid())
+  restaurantId String     @map("restaurant_id")
+  tableNumber  String     @map("table_number")
+  capacity     Int
+  minCapacity  Int?       @map("min_capacity")
+  isAvailable  Boolean    @default(true) @map("is_available")
+  
+  // Table features
+  hasWindow    Boolean?   @default(false) @map("has_window")
+  hasOutdoor   Boolean?   @default(false) @map("has_outdoor")
+  isPrivate    Boolean?   @default(false) @map("is_private")
+  
+  // Timestamps
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  
+  // Relations
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+  
+  // Indexes
+  @@index([restaurantId, tableNumber])
+  @@index([restaurantId, isAvailable])
+  @@unique([restaurantId, tableNumber])
+  @@map("tables")
+}
+
+// Reservation model
+model Reservation {
+  id           String           @id @default(cuid())
+  userId       String           @map("user_id")
+  restaurantId String           @map("restaurant_id")
+  tableId      String           @map("table_id")
+  
+  // Reservation details
+  reservationDate DateTime       @map("reservation_date") // Date part only
+  reservationTime String         @map("reservation_time") // HH:MM format
+  partySize     Int             @map("party_size")
+  status        ReservationStatus @default(PENDING)
+  
+  // Special requests and notes
+  specialRequests String?        @map("special_requests")
+  notes         String?
+  
+  // Timestamps
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  
+  // Relations
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table         Table           @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([userId])
+  @@index([restaurantId])
+  @@index([tableId])
+  @@index([reservationDate, status])
+  @@index([restaurantId, reservationDate, status])
+  @@map("reservations")
+}
+
+// Review model
+model Review {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  restaurantId String    @map("restaurant_id")
+  
+  // Review content
+  rating       Int       // 1-5 stars
+  title        String?
+  content      String?
+  
+  // Review metadata
+  isVerified   Boolean   @default(false) @map("is_verified")
+  isApproved   Boolean   @default(true) @map("is_approved")
+  
+  // Timestamps
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant  Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([userId])
+  @@index([restaurantId])
+  @@index([rating])
+  @@index([isApproved])
+  @@unique([userId, restaurantId])
+  @@map("reviews")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum PriceRange {
+  LOW
+  MEDIUM
+  HIGH
+  PREMIUM
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
